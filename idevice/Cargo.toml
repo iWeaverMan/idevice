@@ -73,6 +73,25 @@ async_zip = { version = "0.0.18", optional = true }
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"
 
+# Native-only tokio features: `fs` (used by `utils::installation` helpers) and
+# `rt-multi-thread` (used by AFC's close-on-drop fallback). Both are rejected
+# by tokio on wasm32-unknown-unknown.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["fs", "rt-multi-thread"] }
+
+# wasm32-unknown-unknown: forward `js` / `wasm_js` features through to the
+# transitive `getrandom` crates so Web Crypto is used for randomness, and
+# pull in a pure-Rust rustls `CryptoProvider` (`rustls-rustcrypto`).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = ["js"], optional = true }
+getrandom_04 = { package = "getrandom", version = "0.4", default-features = false, features = ["wasm_js"], optional = true }
+rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }
+# Forwards the `web` feature so `rustls-pki-types::UnixTime::now()` uses `Date.now()`.
+rustls-pki-types = { version = "1", default-features = false, features = ["web"], optional = true }
+# Drop-in replacement for `tokio::time` on wasm32-unknown-unknown; tokio's own
+# timer panics at runtime on this target (see tokio docs).
+wasmtimer = { version = "0.4", default-features = false, features = ["tokio"], optional = true }
+
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full"] }
 tun-rs = { version = "2.0.8", features = ["async_tokio"] }
@@ -85,7 +104,7 @@ ring = ["rustls", "rustls/ring", "tokio-rustls/ring"]
 rustls = ["dep:rustls", "dep:tokio-rustls"]
 openssl = ["dep:openssl", "dep:tokio-openssl"]
 
-afc = ["dep:chrono", "dep:futures", "tokio/rt-multi-thread"]
+afc = ["dep:chrono", "dep:futures"]
 amfi = []
 bt_packet_logger = []
 companion_proxy = []
@@ -109,7 +128,6 @@ installation_proxy = [
   "dep:futures",
   "async_zip/tokio",
   "async_zip/deflate",
-  "tokio/fs",
 ]
 installcoordination_proxy = []
 xctest = [
@@ -139,6 +157,20 @@ pair = ["chrono/default", "tokio/time", "dep:sha2", "dep:rsa", "dep:x509-cert"]
 pcapd = []
 preboard_service = []
 obfuscate = ["dep:obfstr"]
+# Pure-Rust rustls `CryptoProvider` for environments where ring/aws-lc-rs
+# can't be built (notably wasm32-unknown-unknown).
+wasm-crypto = ["rustls", "dep:rustls-rustcrypto"]
+# Enables wasm32-unknown-unknown support: forwards Web Crypto features to
+# the transitive `getrandom` crates and selects `rustls-rustcrypto` as the
+# TLS crypto backend. Consumers must bring their own transport implementing
+# `ReadWrite` (no `tcp`/`usbmuxd` on this target).
+wasm = [
+  "dep:getrandom_02",
+  "dep:getrandom_04",
+  "dep:rustls-pki-types",
+  "dep:wasmtimer",
+  "wasm-crypto",
+]
 remote_pairing = [
   "dep:serde_json",
   "dep:json",

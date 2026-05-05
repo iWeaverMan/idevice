@@ -348,7 +348,7 @@ impl LockdownClient {
                     break Ok(p);
                 }
                 Err(IdeviceError::PairingDialogResponsePending) => {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    crate::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
                 Err(e) => break Err(e),
             }

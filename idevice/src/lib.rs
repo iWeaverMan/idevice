@@ -27,6 +27,18 @@ pub mod xpc;
 
 pub mod services;
 pub use services::*;
+
+/// Time primitives that work across native and wasm32-unknown-unknown.
+///
+/// On native targets this is `tokio::time`. On wasm32 we route to `wasmtimer`
+/// because `tokio::time` panics at runtime there (no timer backend).
+#[allow(unused_imports)]
+pub(crate) mod time {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub use tokio::time::*;
+    #[cfg(target_arch = "wasm32")]
+    pub use wasmtimer::tokio::*;
+}
 #[cfg(any(feature = "core_device_proxy", feature = "remote_pairing"))]
 pub mod tunnel;
 
@@ -599,10 +611,32 @@ impl Idevice {
                         rustls::crypto::aws_lc_rs::default_provider()
                     }
 
-                    #[cfg(not(any(feature = "ring", feature = "aws-lc")))]
+                    #[cfg(all(
+                        target_arch = "wasm32",
+                        feature = "wasm-crypto",
+                        not(any(feature = "ring", feature = "aws-lc"))
+                    ))]
+                    {
+                        debug!("Using rustls-rustcrypto (pure Rust) crypto backend");
+                        rustls_rustcrypto::provider()
+                    }
+
+                    #[cfg(all(
+                        not(target_arch = "wasm32"),
+                        not(any(feature = "ring", feature = "aws-lc"))
+                    ))]
                     {
                         compile_error!(
                             "No crypto backend was selected! Specify an idevice feature for a crypto backend"
+                        );
+                    }
+                    #[cfg(all(
+                        target_arch = "wasm32",
+                        not(any(feature = "ring", feature = "aws-lc", feature = "wasm-crypto"))
+                    ))]
+                    {
+                        compile_error!(
+                            "No crypto backend was selected! On wasm32 enable the `wasm-crypto` (or `wasm`) feature."
                         );
                     }
 
@@ -930,7 +964,9 @@ impl IdeviceError {
             IdeviceError::Socket(_) => 1,
             #[cfg(feature = "rustls")]
             IdeviceError::PemParseFailed(_) => 2,
+            #[cfg(any(feature = "rustls", feature = "openssl"))]
             IdeviceError::Rustls(_) => 3,
+            #[cfg(any(feature = "rustls", feature = "openssl"))]
             IdeviceError::TlsBuilderFailed(_) => 4,
 
             // 5: Data format

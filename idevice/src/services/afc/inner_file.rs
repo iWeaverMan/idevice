@@ -453,23 +453,30 @@ crate::impl_trait_to_structs!(Drop for InnerFileDescriptor<'_>, OwnedInnerFileDe
             // dereferenced.
             self.pending_fut = None;
 
-            let handle = tokio::runtime::Handle::current();
+            // Best-effort close-on-drop only works on a multi-thread tokio
+            // runtime. On wasm32 there's no such runtime; on a current-thread
+            // runtime `block_in_place` would panic. In both cases the caller
+            // must invoke `.close().await` explicitly to release the FD.
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let handle = tokio::runtime::Handle::current();
 
-            if matches!(
-                handle.runtime_flavor(),
-                tokio::runtime::RuntimeFlavor::CurrentThread
-            ) {
-                return;
+                if matches!(
+                    handle.runtime_flavor(),
+                    tokio::runtime::RuntimeFlavor::CurrentThread
+                ) {
+                    return;
+                }
+
+                tokio::task::block_in_place(move || {
+                    handle.block_on(async move {
+                        unsafe { Pin::new_unchecked(self) }
+                            .close_inner()
+                            .await
+                            .ok();
+                    })
+                });
             }
-
-            tokio::task::block_in_place(move || {
-                handle.block_on(async move {
-                    unsafe { Pin::new_unchecked(self) }
-                        .close_inner()
-                        .await
-                        .ok();
-                })
-            });
         }
     }
 });

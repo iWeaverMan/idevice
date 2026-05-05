@@ -148,8 +148,15 @@ impl PairingFile {
     /// - Cryptographic materials are invalid
     pub fn from_value(v: &plist::Value) -> Result<Self, crate::IdeviceError> {
         let raw: RawPairingFile = plist::from_value(v)?;
-        let p = raw.try_into()?;
-        Ok(p)
+        match raw.try_into() {
+            Ok(p) => Ok(p),
+            Err(e) => {
+                warn!("Unable to convert raw pairing file into pairing file: {e:?}");
+                Err(crate::IdeviceError::UnexpectedResponse(
+                    "failed to convert raw pairing file into pairing file".into(),
+                ))
+            }
+        }
     }
 
     /// Serializes the pairing file to a PLIST-formatted byte vector
