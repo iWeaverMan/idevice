@@ -2,7 +2,7 @@
 name = "idevice"
 description = "A Rust library to interact with services on iOS devices."
 authors = ["Jackson Coxson"]
-version = "0.1.58"
+version = "0.1.59"
 edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/idevice"
@@ -87,14 +87,22 @@ tokio = { version = "1", features = ["fs", "rt-multi-thread"] }
 # transitive `getrandom` crates so Web Crypto is used for randomness, and
 # pull in a pure-Rust rustls `CryptoProvider` (`rustls-rustcrypto`).
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = ["js"], optional = true }
-getrandom_04 = { package = "getrandom", version = "0.4", default-features = false, features = ["wasm_js"], optional = true }
+getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = [
+  "js",
+], optional = true }
+getrandom_04 = { package = "getrandom", version = "0.4", default-features = false, features = [
+  "wasm_js",
+], optional = true }
 rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }
 # Forwards the `web` feature so `rustls-pki-types::UnixTime::now()` uses `Date.now()`.
-rustls-pki-types = { version = "1", default-features = false, features = ["web"], optional = true }
+rustls-pki-types = { version = "1", default-features = false, features = [
+  "web",
+], optional = true }
 # Drop-in replacement for `tokio::time` on wasm32-unknown-unknown; tokio's own
 # timer panics at runtime on this target (see tokio docs).
-wasmtimer = { version = "0.4", default-features = false, features = ["tokio"], optional = true }
+wasmtimer = { version = "0.4", default-features = false, features = [
+  "tokio",
+], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full"] }
@@ -157,7 +165,14 @@ notification_proxy = [
   "dep:futures",
 ]
 location_simulation = []
-pair = ["chrono/default", "tokio/time", "dep:sha2", "dep:rsa", "dep:x509-cert", "dep:web-time"]
+pair = [
+  "chrono/default",
+  "tokio/time",
+  "dep:sha2",
+  "dep:rsa",
+  "dep:x509-cert",
+  "dep:web-time",
+]
 pcapd = []
 preboard_service = []
 obfuscate = ["dep:obfstr"]
