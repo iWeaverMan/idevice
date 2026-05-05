@@ -11,7 +11,7 @@ keywords = ["lockdownd", "ios"]
 
 
 [dependencies]
-tokio = { version = "1", features = ["io-util"] }
+tokio = { version = "1", features = ["io-util", "time"] }
 tokio-rustls = { version = "0.26", default-features = false, optional = true }
 rustls = { version = "0.23", default-features = false, features = [
   "std",
@@ -69,6 +69,10 @@ rand = { version = "0.10" }
 obfstr = { version = "0.4", optional = true }
 
 async_zip = { version = "0.0.18", optional = true }
+
+# Drop-in for `std::time::SystemTime` that's a zero-cost alias on native and
+# uses `Date.now()` on wasm32-unknown-unknown (where `SystemTime::now()` panics).
+web-time = { version = "1", optional = true }
 
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"
@@ -153,7 +157,7 @@ notification_proxy = [
   "dep:futures",
 ]
 location_simulation = []
-pair = ["chrono/default", "tokio/time", "dep:sha2", "dep:rsa", "dep:x509-cert"]
+pair = ["chrono/default", "tokio/time", "dep:sha2", "dep:rsa", "dep:x509-cert", "dep:web-time"]
 pcapd = []
 preboard_service = []
 obfuscate = ["dep:obfstr"]

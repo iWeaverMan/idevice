@@ -1425,6 +1425,7 @@ dependencies = [
  "tun-rs",
  "uuid",
  "wasmtimer",
+ "web-time",
  "x25519-dalek",
  "x509-cert",
 ]
