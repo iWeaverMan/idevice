@@ -64,6 +64,7 @@ rsd = ["idevice/rsd"]
 syslog_relay = ["idevice/syslog_relay"]
 tcp = ["idevice/tcp"]
 tunnel_tcp_stack = ["idevice/tunnel_tcp_stack"]
+tunnel_tcp_stack_pcap = ["idevice/tunnel_tcp_stack_pcap"]
 tss = ["idevice/tss"]
 tunneld = ["idevice/tunneld"]
 usbmuxd = ["idevice/usbmuxd"]
@@ -109,6 +110,7 @@ full = [
   "syslog_relay",
   "tcp",
   "tunnel_tcp_stack",
+  "tunnel_tcp_stack_pcap",
   "tss",
   "tunneld",
   "usbmuxd",

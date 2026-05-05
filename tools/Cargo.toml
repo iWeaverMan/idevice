@@ -39,6 +39,7 @@ idevice = { path = "../idevice", features = [
   "condition_inducer",
   "network_monitor",
   "sysmontap",
+  "tunnel_tcp_stack_pcap",
 ], default-features = false }
 tokio = { version = "1.43", features = ["full"] }
 tracing = { version = "0.1.41" }
