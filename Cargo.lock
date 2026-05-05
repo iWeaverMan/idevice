@@ -1392,6 +1392,7 @@ dependencies = [
  "tracing",
  "tun-rs",
  "uuid",
+ "wasm-bindgen-futures",
  "wasmtimer",
  "web-time",
  "x25519-dalek",

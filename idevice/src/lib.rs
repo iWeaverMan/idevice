@@ -38,6 +38,28 @@ pub(crate) mod time {
     pub use tokio::time::*;
     #[cfg(target_arch = "wasm32")]
     pub use wasmtimer::tokio::*;
+    #[cfg(target_arch = "wasm32")]
+    pub use wasmtimer::std::Instant;
+}
+
+/// Spawn a `'static + Send` future on whatever async executor is current.
+/// `tokio::spawn` on native; `wasm_bindgen_futures::spawn_local` on wasm32
+/// (the latter doesn't require Send but accepts Send futures fine). Returns
+/// `()` so callers don't see a JoinHandle — for tasks that need cancellation,
+/// pair the spawn with an explicit `tokio::sync::Notify` / channel signal.
+#[allow(dead_code)]
+pub(crate) fn spawn<F>(fut: F)
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        tokio::spawn(fut);
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_bindgen_futures::spawn_local(fut);
+    }
 }
 #[cfg(any(feature = "core_device_proxy", feature = "remote_pairing"))]
 pub mod tunnel;

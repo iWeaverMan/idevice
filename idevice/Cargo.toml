@@ -103,6 +103,10 @@ rustls-pki-types = { version = "1", default-features = false, features = [
 wasmtimer = { version = "0.4", default-features = false, features = [
   "tokio",
 ], optional = true }
+# `tokio::spawn` requires the `rt` feature, which doesn't compile on
+# wasm32-unknown-unknown. The `crate::spawn` shim falls back to
+# `wasm_bindgen_futures::spawn_local` here.
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full"] }
@@ -188,6 +192,7 @@ wasm = [
   "dep:getrandom_04",
   "dep:rustls-pki-types",
   "dep:wasmtimer",
+  "dep:wasm-bindgen-futures",
   "wasm-crypto",
 ]
 remote_pairing = [
