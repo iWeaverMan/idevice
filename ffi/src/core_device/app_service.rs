@@ -7,6 +7,8 @@ use std::ptr::{self, null_mut};
 use idevice::core_device::AppServiceClient;
 use idevice::{IdeviceError, ReadWrite, RsdService};
 
+use plist::{Dictionary, Value};
+
 use crate::core_device_proxy::AdapterHandle;
 use crate::rsd::RsdHandshakeHandle;
 use crate::{IdeviceFfiError, ReadWriteOpaque, ffi_err, run_sync, run_sync_local};
@@ -313,6 +315,8 @@ pub unsafe extern "C" fn app_service_launch_app(
     bundle_id: *const c_char,
     argv: *const *const c_char,
     argc: usize,
+    envv: *const *const c_char,
+    envc: usize,
     kill_existing: c_int,
     start_suspended: c_int,
     stdio_uuid: *const u8,
@@ -339,6 +343,21 @@ pub unsafe extern "C" fn app_service_launch_app(
         }
     }
 
+    let mut env_dict = Dictionary::new();
+    if !envv.is_null() {
+        let env_vars_slice = unsafe { std::slice::from_raw_parts(envv, envc) };
+        for &env_var in env_vars_slice {
+            if !env_var.is_null() {
+                let env_var = unsafe { CStr::from_ptr(env_var) };
+                if let Ok(env_var) = env_var.to_str()
+                    && let Some((key, value)) = env_var.split_once('=')
+                {
+                    env_dict.insert(key.to_string(), Value::String(value.to_string()));
+                }
+            }
+        }
+    }
+
     let stdio_uuid = if stdio_uuid.is_null() {
         None
     } else {
@@ -354,7 +373,7 @@ pub unsafe extern "C" fn app_service_launch_app(
                 &args,
                 kill_existing != 0,
                 start_suspended != 0,
-                None, // environment
+                Some(env_dict), // environment
                 None, // platform_options
                 stdio_uuid,
             )

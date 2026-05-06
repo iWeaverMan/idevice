@@ -91,17 +91,24 @@ AppService::list_apps(bool app_clips, bool removable, bool hidden,
 
 Result<LaunchResponse, FfiError>
 AppService::launch(const std::string &bundle_id,
-                   const std::vector<std::string> &argv, bool kill_existing,
+                   const std::vector<std::string> &argv, 
+                   const std::vector<std::string> &envv, bool kill_existing,
                    bool start_suspended) {
   std::vector<const char *> c_argv;
   c_argv.reserve(argv.size());
   for (auto &s : argv)
     c_argv.push_back(s.c_str());
+  
+  std::vector<const char *> c_envv;
+  c_envv.reserve(envv.size());
+  for (auto &s : envv)
+    c_envv.push_back(s.c_str());
 
   LaunchResponseC *resp = nullptr;
   if (IdeviceFfiError *e = ::app_service_launch_app(
           handle_.get(), bundle_id.c_str(),
           c_argv.empty() ? nullptr : c_argv.data(), c_argv.size(),
+          c_envv.empty() ? nullptr : c_envv.data(), c_envv.size(),
           kill_existing ? 1 : 0, start_suspended ? 1 : 0,
           NULL, // TODO: stdio handling
           &resp)) {
