@@ -2,7 +2,7 @@
 name = "idevice-tools"
 description = "Rust binary tools to interact with services on iOS devices."
 authors = ["Jackson Coxson"]
-version = "0.1.58"
+version = "0.1.59"
 edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/idevice"
@@ -39,6 +39,7 @@ idevice = { path = "../idevice", features = [
   "condition_inducer",
   "network_monitor",
   "sysmontap",
+  "tunnel_tcp_stack_pcap",
 ], default-features = false }
 tokio = { version = "1.43", features = ["full"] }
 tracing = { version = "0.1.41" }

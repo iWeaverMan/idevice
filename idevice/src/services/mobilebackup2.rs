@@ -113,9 +113,15 @@ pub trait BackupDelegate: Send + Sync {
 ///
 /// Returns `0` for [`get_free_disk_space`](BackupDelegate::get_free_disk_space);
 /// override or wrap this if you need real disk-space reporting.
+///
+/// Native-only: `tokio::fs` doesn't compile on `wasm32-unknown-unknown`.
+/// Wasm consumers must implement their own [`BackupDelegate`] backed by
+/// IndexedDB / OPFS / an in-memory store / etc.
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, Copy)]
 pub struct FsBackupDelegate;
 
+#[cfg(not(target_arch = "wasm32"))]
 impl BackupDelegate for FsBackupDelegate {
     fn get_free_disk_space(&self, _path: &Path) -> u64 {
         0

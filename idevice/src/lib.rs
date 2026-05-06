@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![cfg_attr(docsrs, doc = include_str!("../README.md"))]
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
 // Jackson Coxson
@@ -27,6 +27,40 @@ pub mod xpc;
 
 pub mod services;
 pub use services::*;
+
+/// Time primitives that work across native and wasm32-unknown-unknown.
+///
+/// On native targets this is `tokio::time`. On wasm32 we route to `wasmtimer`
+/// because `tokio::time` panics at runtime there (no timer backend).
+#[allow(unused_imports)]
+pub(crate) mod time {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub use tokio::time::*;
+    #[cfg(target_arch = "wasm32")]
+    pub use wasmtimer::std::Instant;
+    #[cfg(target_arch = "wasm32")]
+    pub use wasmtimer::tokio::*;
+}
+
+/// Spawn a `'static + Send` future on whatever async executor is current.
+/// `tokio::spawn` on native; `wasm_bindgen_futures::spawn_local` on wasm32
+/// (the latter doesn't require Send but accepts Send futures fine). Returns
+/// `()` so callers don't see a JoinHandle — for tasks that need cancellation,
+/// pair the spawn with an explicit `tokio::sync::Notify` / channel signal.
+#[allow(dead_code)]
+pub(crate) fn spawn<F>(fut: F)
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        tokio::spawn(fut);
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_bindgen_futures::spawn_local(fut);
+    }
+}
 #[cfg(any(feature = "core_device_proxy", feature = "remote_pairing"))]
 pub mod tunnel;
 
@@ -599,10 +633,32 @@ impl Idevice {
                         rustls::crypto::aws_lc_rs::default_provider()
                     }
 
-                    #[cfg(not(any(feature = "ring", feature = "aws-lc")))]
+                    #[cfg(all(
+                        target_arch = "wasm32",
+                        feature = "wasm-crypto",
+                        not(any(feature = "ring", feature = "aws-lc"))
+                    ))]
+                    {
+                        debug!("Using rustls-rustcrypto (pure Rust) crypto backend");
+                        rustls_rustcrypto::provider()
+                    }
+
+                    #[cfg(all(
+                        not(target_arch = "wasm32"),
+                        not(any(feature = "ring", feature = "aws-lc"))
+                    ))]
                     {
                         compile_error!(
                             "No crypto backend was selected! Specify an idevice feature for a crypto backend"
+                        );
+                    }
+                    #[cfg(all(
+                        target_arch = "wasm32",
+                        not(any(feature = "ring", feature = "aws-lc", feature = "wasm-crypto"))
+                    ))]
+                    {
+                        compile_error!(
+                            "No crypto backend was selected! On wasm32 enable the `wasm-crypto` (or `wasm`) feature."
                         );
                     }
 
@@ -930,7 +986,9 @@ impl IdeviceError {
             IdeviceError::Socket(_) => 1,
             #[cfg(feature = "rustls")]
             IdeviceError::PemParseFailed(_) => 2,
+            #[cfg(any(feature = "rustls", feature = "openssl"))]
             IdeviceError::Rustls(_) => 3,
+            #[cfg(any(feature = "rustls", feature = "openssl"))]
             IdeviceError::TlsBuilderFailed(_) => 4,
 
             // 5: Data format

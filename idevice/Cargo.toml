@@ -2,7 +2,7 @@
 name = "idevice"
 description = "A Rust library to interact with services on iOS devices."
 authors = ["Jackson Coxson"]
-version = "0.1.58"
+version = "0.1.60"
 edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/idevice"
@@ -11,7 +11,7 @@ keywords = ["lockdownd", "ios"]
 
 
 [dependencies]
-tokio = { version = "1", features = ["io-util"] }
+tokio = { version = "1", features = ["io-util", "time"] }
 tokio-rustls = { version = "0.26", default-features = false, optional = true }
 rustls = { version = "0.23", default-features = false, features = [
   "std",
@@ -24,7 +24,7 @@ plist = { version = "1.8" }
 plist-macro = { version = "0.1.6" }
 serde = { version = "1", features = ["derive"] }
 ns-keyed-archive = { version = "0.1.5", optional = true }
-jktcp = { version = "0.1.1", optional = true }
+jktcp = { version = "0.1.3", optional = true, default-features = false }
 
 thiserror = { version = "2" }
 tracing = { version = "0.1.41" }
@@ -62,6 +62,7 @@ aes = { version = "0.8", optional = true }
 cbc = { version = "0.1", features = ["alloc"], optional = true }
 hmac = { version = "0.12", optional = true }
 sha1 = { version = "0.10", optional = true }
+siphasher = { version = "1", optional = true }
 idevice-srp = { version = "0.6", optional = true }
 rand = { version = "0.10" }
 
@@ -69,8 +70,43 @@ obfstr = { version = "0.4", optional = true }
 
 async_zip = { version = "0.0.18", optional = true }
 
+# Drop-in for `std::time::SystemTime` that's a zero-cost alias on native and
+# uses `Date.now()` on wasm32-unknown-unknown (where `SystemTime::now()` panics).
+web-time = { version = "1", optional = true }
+
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"
+
+# Native-only tokio features: `fs` (used by `utils::installation` helpers) and
+# `rt-multi-thread` (used by AFC's close-on-drop fallback). Both are rejected
+# by tokio on wasm32-unknown-unknown.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["fs", "rt-multi-thread"] }
+
+# wasm32-unknown-unknown: forward `js` / `wasm_js` features through to the
+# transitive `getrandom` crates so Web Crypto is used for randomness, and
+# pull in a pure-Rust rustls `CryptoProvider` (`rustls-rustcrypto`).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = [
+  "js",
+], optional = true }
+getrandom_04 = { package = "getrandom", version = "0.4", default-features = false, features = [
+  "wasm_js",
+], optional = true }
+rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }
+# Forwards the `web` feature so `rustls-pki-types::UnixTime::now()` uses `Date.now()`.
+rustls-pki-types = { version = "1", default-features = false, features = [
+  "web",
+], optional = true }
+# Drop-in replacement for `tokio::time` on wasm32-unknown-unknown; tokio's own
+# timer panics at runtime on this target (see tokio docs).
+wasmtimer = { version = "0.4", default-features = false, features = [
+  "tokio",
+], optional = true }
+# `tokio::spawn` requires the `rt` feature, which doesn't compile on
+# wasm32-unknown-unknown. The `crate::spawn` shim falls back to
+# `wasm_bindgen_futures::spawn_local` here.
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full"] }
@@ -108,7 +144,6 @@ installation_proxy = [
   "dep:futures",
   "async_zip/tokio",
   "async_zip/deflate",
-  "tokio/fs",
 ]
 installcoordination_proxy = []
 xctest = [
@@ -134,10 +169,32 @@ notification_proxy = [
   "dep:futures",
 ]
 location_simulation = []
-pair = ["chrono/default", "tokio/time", "dep:sha2", "dep:rsa", "dep:x509-cert"]
+pair = [
+  "chrono/default",
+  "tokio/time",
+  "dep:sha2",
+  "dep:rsa",
+  "dep:x509-cert",
+  "dep:web-time",
+]
 pcapd = []
 preboard_service = []
 obfuscate = ["dep:obfstr"]
+# Pure-Rust rustls `CryptoProvider` for environments where ring/aws-lc-rs
+# can't be built (notably wasm32-unknown-unknown).
+wasm-crypto = ["rustls", "dep:rustls-rustcrypto"]
+# Enables wasm32-unknown-unknown support: forwards Web Crypto features to
+# the transitive `getrandom` crates and selects `rustls-rustcrypto` as the
+# TLS crypto backend. Consumers must bring their own transport implementing
+# `ReadWrite` (no `tcp`/`usbmuxd` on this target).
+wasm = [
+  "dep:getrandom_02",
+  "dep:getrandom_04",
+  "dep:rustls-pki-types",
+  "dep:wasmtimer",
+  "dep:wasm-bindgen-futures",
+  "wasm-crypto",
+]
 remote_pairing = [
   "dep:serde_json",
   "dep:json",
@@ -146,6 +203,7 @@ remote_pairing = [
   "dep:hkdf",
   "dep:chacha20poly1305",
   "dep:idevice-srp",
+  "dep:siphasher",
   "dep:uuid",
   "dep:aes",
   "dep:cbc",
@@ -158,6 +216,10 @@ screenshotr = []
 syslog_relay = ["dep:bytes"]
 tcp = ["tokio/net"]
 tunnel_tcp_stack = ["dep:jktcp"]
+# Adds pcap (`tokio::fs`) support to the software TCP tunnel. Pulls in
+# `tokio/fs`, which doesn't compile on wasm32, so it is opt-in rather than
+# implied by `tunnel_tcp_stack`.
+tunnel_tcp_stack_pcap = ["tunnel_tcp_stack", "jktcp/pcap"]
 tss = ["dep:uuid", "dep:reqwest"]
 tunneld = ["dep:serde_json", "dep:json", "dep:reqwest"]
 usbmuxd = ["tokio/net", "dep:futures"]
@@ -211,3 +273,4 @@ full = [
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
