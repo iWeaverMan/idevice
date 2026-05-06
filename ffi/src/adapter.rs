@@ -153,7 +153,7 @@ pub unsafe extern "C" fn adapter_close(handle: *mut AdapterHandle) -> *mut Idevi
 /// `data` must be a valid pointer to at least `length` bytes
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn adapter_send(
-    handle: *mut AdapterStreamHandle,
+    handle: *mut ReadWriteOpaque,
     data: *const u8,
     length: usize,
 ) -> *mut IdeviceFfiError {
@@ -161,7 +161,8 @@ pub unsafe extern "C" fn adapter_send(
         return ffi_err!(IdeviceError::FfiInvalidArg);
     }
 
-    let adapter = unsafe { &mut (*handle).0 };
+    // let adapter = unsafe { &mut (*handle).0 };
+    let adapter = unsafe { (*handle).inner.as_mut().unwrap() };
     let data_slice = unsafe { std::slice::from_raw_parts(data, length) };
 
     let res = run_sync(async move { adapter.write_all(data_slice).await });
@@ -192,7 +193,7 @@ pub unsafe extern "C" fn adapter_send(
 /// `length` must be a valid pointer to a usize
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn adapter_recv(
-    handle: *mut AdapterStreamHandle,
+    handle: *mut ReadWriteOpaque,
     data: *mut u8,
     length: *mut usize,
     max_length: usize,
@@ -201,7 +202,8 @@ pub unsafe extern "C" fn adapter_recv(
         return ffi_err!(IdeviceError::FfiInvalidArg);
     }
 
-    let adapter = unsafe { &mut (*handle).0 };
+    // let adapter = unsafe { &mut (*handle).0 };
+    let adapter = unsafe { (*handle).inner.as_mut().unwrap() };
     let res: Result<Vec<u8>, std::io::Error> = run_sync(async move {
         let mut buf = [0; 2048];
         let res = adapter.read(&mut buf).await?;
