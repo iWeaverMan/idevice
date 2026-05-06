@@ -37,9 +37,9 @@ pub(crate) mod time {
     #[cfg(not(target_arch = "wasm32"))]
     pub use tokio::time::*;
     #[cfg(target_arch = "wasm32")]
-    pub use wasmtimer::tokio::*;
-    #[cfg(target_arch = "wasm32")]
     pub use wasmtimer::std::Instant;
+    #[cfg(target_arch = "wasm32")]
+    pub use wasmtimer::tokio::*;
 }
 
 /// Spawn a `'static + Send` future on whatever async executor is current.
